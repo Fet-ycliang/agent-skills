@@ -1,11 +1,11 @@
 ---
 name: hosted-agents-v2-py
-description: |
-  Build hosted agents using Azure AI Projects SDK with ImageBasedHostedAgentDefinition.
-  Use when creating container-based agents that run custom code in Azure AI Foundry.
-  Triggers: "ImageBasedHostedAgentDefinition", "hosted agent", "container agent", 
-  "create_version", "ProtocolVersionRecord", "AgentProtocol.RESPONSES".
-package: azure-ai-projects
+description: "Build hosted agents using Azure AI Projects SDK with ImageBasedHostedAgentDefinition.\nUse when creating container-based agents that run custom code in Azure AI Foundry.\nTriggers: \"ImageBasedHostedAgentDefinition\", \"hosted agent\", \"container agent\", \n\"create_version\", \"ProtocolVersionRecord\", \"AgentProtocol.RESPONSES\".\n"
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: azure-ai-projects
 ---
 
 # Azure AI Hosted Agents (Python)

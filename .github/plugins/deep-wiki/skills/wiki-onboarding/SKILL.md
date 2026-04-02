@@ -1,6 +1,10 @@
 ---
 name: wiki-onboarding
 description: Generates four audience-tailored onboarding guides in an onboarding/ folder — Contributor, Staff Engineer, Executive, and Product Manager. Use when the user wants onboarding documentation for a codebase.
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
 ---
 
 # Wiki Onboarding Guide Generator

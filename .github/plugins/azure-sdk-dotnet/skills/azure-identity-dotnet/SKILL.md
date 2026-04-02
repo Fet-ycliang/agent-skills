@@ -2,7 +2,11 @@
 name: azure-identity-dotnet
 description: |
   Azure Identity library for .NET. Authentication library for Azure SDK clients using Microsoft Entra ID. Use for DefaultAzureCredential, managed identity, service principals, and developer credentials. Triggers: "Azure Identity", "DefaultAzureCredential", "ManagedIdentityCredential", "ClientSecretCredential", "authentication .NET", "Azure auth", "credential chain".
-package: Azure.Identity
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: Azure.Identity
 ---
 
 # Azure Identity library for .NET
