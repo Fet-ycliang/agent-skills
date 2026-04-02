@@ -3,7 +3,11 @@ name: azure-identity-py
 description: |
   Azure Identity SDK for Python authentication with Microsoft Entra ID. Use for DefaultAzureCredential, managed identity, service principals, and token caching.
   Triggers: "azure-identity", "DefaultAzureCredential", "authentication", "managed identity", "service principal", "credential".
-package: azure-identity
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: azure-identity
 ---
 
 # Azure Identity library for Python

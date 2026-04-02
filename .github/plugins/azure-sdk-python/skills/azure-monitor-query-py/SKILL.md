@@ -3,7 +3,11 @@ name: azure-monitor-query-py
 description: |
   Azure Monitor Query SDK for Python. Use for querying Log Analytics workspaces and Azure Monitor metrics.
   Triggers: "azure-monitor-query", "LogsQueryClient", "MetricsQueryClient", "Log Analytics", "Kusto queries", "Azure metrics".
-package: azure-monitor-query
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: azure-monitor-query
 ---
 
 # Azure Monitor Query SDK for Python

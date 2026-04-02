@@ -1,7 +1,11 @@
 ---
 name: azure-identity-ts
 description: Authenticate to Azure services using Azure Identity library for JavaScript (@azure/identity). Use when configuring authentication with DefaultAzureCredential, managed identity, service principals, or interactive browser login.
-package: "@azure/identity"
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: '@azure/identity'
 ---
 
 # Azure Identity library for TypeScript

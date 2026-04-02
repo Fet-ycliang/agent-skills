@@ -2,7 +2,11 @@
 name: azure-mgmt-apicenter-dotnet
 description: |
   Azure API Center SDK for .NET. Centralized API inventory management with governance, versioning, and discovery. Use for creating API services, workspaces, APIs, versions, definitions, environments, deployments, and metadata schemas. Triggers: "API Center", "ApiCenterService", "ApiCenterWorkspace", "ApiCenterApi", "API inventory", "API governance", "API versioning", "API catalog", "API discovery".
-package: Azure.ResourceManager.ApiCenter
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: Azure.ResourceManager.ApiCenter
 ---
 
 # Azure.ResourceManager.ApiCenter (.NET)

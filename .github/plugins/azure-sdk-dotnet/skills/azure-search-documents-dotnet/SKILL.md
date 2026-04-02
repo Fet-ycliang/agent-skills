@@ -2,7 +2,11 @@
 name: azure-search-documents-dotnet
 description: |
   Azure AI Search SDK for .NET (Azure.Search.Documents). Use for building search applications with full-text, vector, semantic, and hybrid search. Covers SearchClient (queries, document CRUD), SearchIndexClient (index management), and SearchIndexerClient (indexers, skillsets). Triggers: "Azure Search .NET", "SearchClient", "SearchIndexClient", "vector search C#", "semantic search .NET", "hybrid search", "Azure.Search.Documents".
-package: Azure.Search.Documents
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: Azure.Search.Documents
 ---
 
 # Azure.Search.Documents (.NET)

@@ -3,7 +3,11 @@ name: azure-ai-voicelive-java
 description: |
   Azure AI VoiceLive SDK for Java. Real-time bidirectional voice conversations with AI assistants using WebSocket.
   Triggers: "VoiceLiveClient java", "voice assistant java", "real-time voice java", "audio streaming java", "voice activity detection java".
-package: com.azure:azure-ai-voicelive
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: com.azure:azure-ai-voicelive
 ---
 
 # Azure AI VoiceLive SDK for Java

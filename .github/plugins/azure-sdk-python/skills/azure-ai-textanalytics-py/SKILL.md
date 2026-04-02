@@ -3,7 +3,11 @@ name: azure-ai-textanalytics-py
 description: |
   Azure AI Text Analytics SDK for sentiment analysis, entity recognition, key phrases, language detection, PII, and healthcare NLP. Use for natural language processing on text.
   Triggers: "text analytics", "sentiment analysis", "entity recognition", "key phrase", "PII detection", "TextAnalyticsClient".
-package: azure-ai-textanalytics
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
+  package: azure-ai-textanalytics
 ---
 
 # Azure AI Text Analytics SDK for Python
