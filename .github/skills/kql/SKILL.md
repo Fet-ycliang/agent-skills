@@ -29,18 +29,17 @@ KQL has two execution planes:
 | **Query** | Table name, `let`, `print`, `datatable` | `StormEvents \| where State == "TEXAS"` |
 | **Management** | `.show`, `.create`, `.set`, `.drop`, `.alter` | `.show tables`, `.show table T schema` |
 
-Management commands cannot be piped into query operators:
+Management commands can be followed by query operators (the output is tabular), but the entire request runs on the management plane. You cannot start with a query and pipe into a management command.
 
 ```kql
-// ❌ WRONG — .show is management, | project is query
-.show tables | project TableName
+// ✅ WORKS — management command piped to query operators
+.show tables | project TableName | where TableName has "Events"
 
-// ✅ RIGHT — run management and query separately
-// Step 1: .show tables
-// Step 2: MyTable | take 5
+// ❌ WRONG — query piped into management command
+StormEvents | take 5 | .show tables
 ```
 
-When in doubt: if the first token starts with `.`, it's a management command.
+When in doubt: if the first token starts with `.`, it's a management command. For a full catalog of schema exploration commands, see `references/discovery-queries.md`.
 
 ## 2. Dynamic Type Discipline
 
@@ -91,7 +90,7 @@ KQL join conditions support **only `==`**. No `<`, `>`, `!=`, or function calls 
 | join kind=inner (other | extend cell = geo_point_to_s2cell(Lon, Lat, 8)) on cell
 ```
 
-For range joins, pre-bin values: `| extend bin_val = bin(Value, 100)`, then join on `bin_val`.
+For range joins, pre-bin values: `| extend bin_val = bin(Value, 100)`, then join on `bin_val`. Note: values near bin boundaries may land in adjacent bins — consider checking neighboring bins or overlapping the range for precision.
 
 ### Left/right attribute matching
 Both sides of a join `on` clause must reference **column entities only** — not expressions, not aggregates.
@@ -101,7 +100,7 @@ Both sides of a join `on` clause must reference **column entities only** — not
 | join kind=inner other on $left.col1
 
 // ✅ FIX — specify both sides explicitly
-| join kind=inner other on $left.col1 == $right.col1
+| join kind=inner (other) on $left.col1 == $right.col1
 ```
 
 ### Cardinality check before large joins
@@ -135,7 +134,7 @@ Unlike Python's `re.findall()`, KQL's `extract_all` **requires capturing groups*
 | `extract_all(regex, source)` | All matches (needs `()`) | `extract_all(@"(\w+)", Text)` |
 | `parse` | Structured extraction | `parse Msg with * "User '" Sender "' sent" *` |
 | `matches regex` | Boolean filter | `where Url matches regex @"^https?://"` |
-| `replace_regex` | Find and replace | `replace_regex(@"\s+", " ", Text)` |
+| `replace_regex` | Find and replace | `replace_regex(Text, @"\s+", " ")` |
 
 ## 5. Serialization Requirements
 
@@ -221,7 +220,7 @@ KQL sometimes requires explicit casts when comparing computed string values — 
 | where tostring(geo_point_to_s2cell(Lon, Lat, 16)) == tostring(other_cell)
 ```
 
-This is most common with computed values from `geo_point_to_s2cell()`, `hash()`, and `strcat()` comparisons. When in doubt, cast with `tostring()`.
+This is most common with computed values from `geo_point_to_s2cell()` and `strcat()` comparisons. When in doubt, cast with `tostring()`.
 
 ## 9. Advanced Functions
 
@@ -249,8 +248,15 @@ Data | extend sim = series_cosine_similarity(parse_json(VecColumn), target)
 
 ### Graph queries
 ```kql
-// Build and traverse a graph
-graph(Nodes, Edges)
+// Persistent graph model — query the latest snapshot
+graph("MyGraphModel")
+| graph-match (src)-[e*1..5]->(dst)
+  where src.Name == "start" and dst.IsTarget == true
+  project src.Name, dst.Name, path_length = array_length(e)
+
+// Transient graph — build inline with make-graph
+Edges
+| make-graph SourceId --> TargetId with Nodes on NodeId
 | graph-match (src)-[e*1..5]->(dst)
   where src.Name == "start" and dst.IsTarget == true
   project src.Name, dst.Name, path_length = array_length(e)
@@ -259,6 +265,7 @@ graph(Nodes, Edges)
 ### Time series
 ```kql
 // Create a time series and detect anomalies
+Events
 | make-series count() default=0 on Timestamp step 1h
 | extend anomalies = series_decompose_anomalies(count_)
 ```
@@ -308,15 +315,15 @@ Datetime literals are a common source of errors. A wrong literal format can casc
 | where datetime_part("year", StartTime) == 2007
 
 // ✅ ALSO RIGHT — use between with datetime range
-| where StartTime between (datetime(2007-01-01) .. datetime(2007-12-31))
+| where StartTime between (datetime(2007-01-01) .. datetime(2007-12-31T23:59:59))
 ```
 
 ### Time bucketing in summarize
 ```kql
-// ❌ WRONG — complex expression directly in by-clause can fail in some engines
+// This works, but can be harder to read and reuse in complex queries
 | summarize count() by startofmonth(StartTime)
 
-// ✅ SAFER — extend first, then summarize by the computed column
+// Clearer — extend first, then summarize by the computed column
 | extend Month = startofmonth(StartTime)
 | summarize count() by Month
 | order by Month asc
@@ -325,12 +332,12 @@ Datetime literals are a common source of errors. A wrong literal format can casc
 ### Useful datetime functions
 | Function | Purpose | Example |
 |----------|---------|---------|
-| `bin(ts, 1h)` | Round to nearest bucket | `bin(Timestamp, 1d)` |
+| `bin(ts, 1h)` | Round down to bucket boundary | `bin(Timestamp, 1d)` |
 | `startofmonth(ts)` | First day of month | `startofmonth(Timestamp)` |
 | `datetime_part("hour", ts)` | Extract component | `datetime_part("year", Timestamp)` |
 | `format_datetime(ts, fmt)` | Format as string | `format_datetime(Timestamp, "yyyy-MM")` |
-| `ago(1d)` | Relative time | `where Timestamp > ago(7d)` |
-| `between(a .. b)` | Range filter | `where Timestamp between (datetime(2024-01-01) .. datetime(2024-01-31))` |
+| `ago(1d)` | Relative time | `where Timestamp > ago(1d)` |
+| `between(a .. b)` | Range filter (inclusive) | `where Timestamp between (datetime(2024-01-01) .. datetime(2024-01-31T23:59:59))` |
 | `todatetime(str)` | Parse string → datetime | `todatetime("2024-01-15T10:30:00Z")` |
 | `totimespan(str)` | Parse string → timespan | `totimespan("01:30:00")` |
 
@@ -347,7 +354,7 @@ KQL has subtle differences from SQL syntax.
 | where State !~ "texas"      // case-insensitive not equal
 
 // In joins, use == only
-| join kind=inner other on $left.Key == $right.Key
+| join kind=inner (other) on $left.Key == $right.Key
 ```
 
 ### sort vs order

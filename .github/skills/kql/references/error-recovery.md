@@ -48,7 +48,7 @@ ip_locations
 // ✅ FIX — pre-filter both sides, check cardinality first
 let filtered_ips = ip_locations | where CountryCode == "US" | summarize by CityName;
 let target_cities = Cities | where HackersCount >= 256 | project CityName;
-filtered_ips | join kind=inner target_cities on CityName
+filtered_ips | join kind=inner (target_cities) on CityName
 ```
 
 ### Pattern C: High-cardinality dcount()
@@ -82,7 +82,7 @@ Logs
 TableA | join kind=inner TableB on $left.Id
 
 // ✅ FIX — specify both sides
-TableA | join kind=inner TableB on $left.Id == $right.Id
+TableA | join kind=inner (TableB) on $left.Id == $right.Id
 ```
 
 ```kql
@@ -201,13 +201,14 @@ Cause: Corrupted cluster URIs or genuine network timeouts.
 
 **Error message**: `Unexpected control command`
 
-```kql
-// ❌ — .show is a management command; don't pipe query operators onto it
-.show tables | project TableName
+This error occurs when a query pipes INTO a management command (not the other way around — management commands CAN have query operators piped after them).
 
-// ✅ — run management and query commands separately
-// Step 1: .show tables
-// Step 2: MyTable | take 5
+```kql
+// ✅ WORKS — management output is tabular, can be filtered
+.show tables | project TableName | where TableName has "Events"
+
+// ❌ ERROR — query piped into management command
+StormEvents | take 5 | .show tables
 ```
 
 ### 6b. Reserved words as identifiers
@@ -321,10 +322,17 @@ Some KQL functions are plugins that may not be enabled on free-tier clusters.
 graph-match (src)-[path*1..3]->(dst)
   where path.IsVulnerable == true
 
-// ✅ — filter edges at definition, not traversal
+// ✅ — filter edges before building the graph
 let edges = Edges | where IsVulnerable == true;
-graph(Nodes, edges)
+edges
+| make-graph SourceId --> TargetId with Nodes on NodeId
 | graph-match (src)-[path*1..3]->(dst)
+  project src.Name, dst.Name
+
+// ✅ — or use label-based filtering on persistent graphs
+graph("MyGraph")
+| graph-match (src)-[path*1..3]->(dst)
+  where all(path, labels() has "Vulnerable")
   project src.Name, dst.Name
 ```
 
