@@ -359,26 +359,11 @@ OccupancyDetection
 Load small reference tables (up to ~100 MB) directly into KQL without ingestion using the `externaldata` operator:
 
 ```kql
-// CSV from blob storage
-let external_csv = externaldata(col1:string, col2:long)
-  [h@'https://storage.blob.core.windows.net/container/file.csv']
-  with (ignoreFirstRecord=true);
-external_csv | where col2 > 100
-```
-
-```kql
-// Gzipped CSV
-let primes = externaldata(prime:long)
-  [h@'https://yourstorage.blob.core.windows.net/prime-numbers/prime-numbers.csv.gz']
-  with (ignoreFirstRecord=true);
-primes | where prime < 100000000 | summarize max(prime)
-```
-
-```kql
-// JSON with ingestion mapping (required for hierarchical formats like JSON, Parquet, Avro, ORC)
-externaldata(Timestamp:datetime, TenantId:guid, MethodName:string)
-  [h@'https://storage.blob.core.windows.net/events/data.json?...SAS...']
-  with (format='multijson', ingestionMapping='[{"Column":"Timestamp","Properties":{"Path":"$.timestamp"}},{"Column":"TenantId","Properties":{"Path":"$.data.tenant"}},{"Column":"MethodName","Properties":{"Path":"$.data.method"}}]')
+// try it! — load Iris dataset from a public CSV on GitHub
+externaldata(SepalLength:real, SepalWidth:real, PetalLength:real, PetalWidth:real, Class:string)
+  [h@"https://raw.githubusercontent.com/uiuc-cse/data-fa14/gh-pages/data/iris.csv"]
+  with (format="csv", ignoreFirstRecord=true)
+| summarize count() by Class
 ```
 
 **Notes**:
