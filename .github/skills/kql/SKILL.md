@@ -68,11 +68,12 @@ StormEvents | order by tolong(StormSummary.TotalDamages) desc
 
 ```kql
 // ❌ ERROR in join: dynamic join key
-| join kind=inner other on $left.Area == $right.Area
+StormEvents | join kind=inner (PopulationData) on $left.StormSummary == $right.State
 
 // ✅ FIX — cast both sides
-| extend Area_str = tostring(Area)
-| join kind=inner (other | extend Area_str = tostring(Area)) on Area_str
+StormEvents
+| extend State_str = tostring(StormSummary.Details.Location)
+| join kind=inner (PopulationData) on $left.State_str == $right.State
 ```
 
 **Self-correction**: When you see "is of a 'dynamic' type" in an error, add `tostring()`, `tolong()`, or `todouble()`.
@@ -86,11 +87,12 @@ KQL join conditions support **only `==`**. No `<`, `>`, `!=`, or function calls 
 
 ```kql
 // ❌ ERROR: "Only equality is allowed in this context"
-| join on geo_distance_2points(a.Lat, a.Lon, b.Lat, b.Lon) < 1000
+StormEvents | join (nyc_taxi) on geo_distance_2points(BeginLon, BeginLat, pickup_longitude, pickup_latitude) < 1000
 
 // ✅ WORKAROUND — pre-bucket into spatial cells, then join on cell ID
-| extend cell = geo_point_to_s2cell(Lon, Lat, 8)
-| join kind=inner (other | extend cell = geo_point_to_s2cell(Lon, Lat, 8)) on cell
+StormEvents
+| extend cell = geo_point_to_s2cell(BeginLon, BeginLat, 8)
+| join kind=inner (nyc_taxi | extend cell = geo_point_to_s2cell(pickup_longitude, pickup_latitude, 8)) on cell
 ```
 
 For range joins, pre-bin values: `| extend bin_val = bin(Value, 100)`, then join on `bin_val`. Note: values near bin boundaries may land in adjacent bins — consider checking neighboring bins or overlapping the range for precision.
@@ -100,10 +102,10 @@ Both sides of a join `on` clause must reference **column entities only** — not
 
 ```kql
 // ❌ ERROR: "for each left attribute, right attribute should be selected"
-| join kind=inner other on $left.col1
+StormEvents | join kind=inner (PopulationData) on $left.State
 
 // ✅ FIX — specify both sides explicitly
-| join kind=inner (other) on $left.col1 == $right.col1
+StormEvents | join kind=inner (PopulationData) on $left.State == $right.State
 ```
 
 ### Cardinality check before large joins
@@ -111,8 +113,8 @@ Both sides of a join `on` clause must reference **column entities only** — not
 
 ```kql
 // Before joining, check how many rows each side contributes
-TableA | summarize dcount(JoinKey)  // → 25,000? Too many for an unconstrained join
-TableB | summarize dcount(JoinKey)  // → 195? OK if filtered first
+StormEvents | summarize dcount(State)        // → 67 distinct states
+PopulationData | summarize dcount(State)     // → 52 — safe to join
 ```
 
 ## 4. Regex in KQL
@@ -235,10 +237,12 @@ KQL handles these natively — no need for Python:
 
 ### Vector similarity
 ```kql
-// Don't export vectors and compute cosine similarity in Python
-let target = toscalar(Vectors | where Word == "test" | project Vec);
-Data | extend sim = series_cosine_similarity(parse_json(VecColumn), target)
-| top 10 by sim desc
+// try it! — cosine similarity on Iris feature vectors
+let target = pack_array(5.1, 3.5, 1.4, 0.2);
+Iris
+| extend Vec = pack_array(SepalLength, SepalWidth, PetalLength, PetalWidth)
+| extend sim = series_cosine_similarity(Vec, target)
+| top 5 by sim desc
 ```
 
 ### Geo operations
@@ -268,9 +272,9 @@ SimpleGraph_Edges
 
 ### Time series
 ```kql
-// Create a time series and detect anomalies
-Events
-| make-series count() default=0 on Timestamp step 1h
+// try it! — create a time series and detect anomalies
+StormEvents
+| make-series count() default=0 on StartTime step 1d
 | extend anomalies = series_decompose_anomalies(count_)
 ```
 
@@ -304,30 +308,31 @@ Datetime literals are a common source of errors. A wrong literal format can casc
 ### Literal format
 ```kql
 // ❌ WRONG — bare year is not a valid datetime
-| where StartTime > datetime(2007)
+StormEvents | where StartTime > datetime(2007)
 
 // ✅ RIGHT — always use full date format
-| where StartTime > datetime(2007-01-01)
+StormEvents | where StartTime > datetime(2007-01-01)
 ```
 
 ### Filtering by year, month, or hour
 ```kql
 // ❌ WRONG — comparing datetime column to integer
-| where StartTime == 2007
+StormEvents | where StartTime == 2007
 
 // ✅ RIGHT — use datetime_part() to extract components
-| where datetime_part("year", StartTime) == 2007
+StormEvents | where datetime_part("year", StartTime) == 2007
 
 // ✅ ALSO RIGHT — use between with datetime range
-| where StartTime between (datetime(2007-01-01) .. datetime(2007-12-31T23:59:59))
+StormEvents | where StartTime between (datetime(2007-01-01) .. datetime(2007-12-31T23:59:59))
 ```
 
 ### Time bucketing in summarize
 ```kql
 // This works, but can be harder to read and reuse in complex queries
-| summarize count() by startofmonth(StartTime)
+StormEvents | summarize count() by startofmonth(StartTime)
 
 // Clearer — extend first, then summarize by the computed column
+StormEvents
 | extend Month = startofmonth(StartTime)
 | summarize count() by Month
 | order by Month asc
@@ -362,13 +367,11 @@ KQL has subtle differences from SQL syntax.
 ### Equality operators
 ```kql
 // In where clauses, == is case-sensitive, =~ is case-insensitive
-| where State == "TEXAS"      // exact match
-| where State =~ "texas"      // case-insensitive
-| where State != "TEXAS"      // not equal
-| where State !~ "texas"      // case-insensitive not equal
+StormEvents | where State == "TEXAS" | count        // exact match
+StormEvents | where State =~ "texas" | count        // case-insensitive
 
 // In joins, use == only
-| join kind=inner (other) on $left.Key == $right.Key
+StormEvents | join kind=inner (PopulationData) on State
 ```
 
 ### sort vs order
@@ -413,11 +416,15 @@ Query 2: extract(@"pattern", 1, col)  → Fix the specific escaping issue → Su
 5. The `parse` operator is often simpler than `extract()` for structured text:
 
 ```kql
-// Instead of complex regex:
-// extract(@"User '([^']+)' sent (\d+) bytes", 1, Message)
+// Instead of complex regex on TraceLogs:
+// extract(@"file path: \"\"([^\"]+)\"\"", 1, Message)
 
-// Use parse for structured extraction:
-| parse Message with * "User '" Username "' sent " ByteCount " bytes" *
+// Use parse for structured extraction (try it on help cluster, SampleLogs db):
+cluster("help").database("SampleLogs").TraceLogs
+| where Message has "file path"
+| parse Message with * "file path: \"\"" FilePath "\"\"" *
+| project Timestamp, FilePath
+| take 5
 ```
 
 ## 14. Query Writing Checklist

@@ -128,20 +128,16 @@ graph("MyGraph")
 For persistent models, create materialized snapshots for faster queries:
 
 ```kql
-// Create a snapshot (management command, async)
-.make graph_snapshot YaccNetwork_20240115
-  with (source = graph_model("YaccNetwork"))
+// Create a snapshot (management command, async — not runnable on help cluster)
+.make graph_snapshot Simple_20240115
+  with (source = graph_model("Simple"))
 
-// Query — picks up latest snapshot automatically
-graph("YaccNetwork")
+// try it! — query picks up latest snapshot automatically
+graph("Simple")
 | graph-match (src)-[e]->(dst)
-  where labels(src) has "Application"
-  project src.AppName, dst.AppName
-
-// Query a specific snapshot
-graph("YaccNetwork", "YaccNetwork_20240115")
-| graph-match (src)-[e]->(dst)
-  project src.AppName, dst.AppName
+  where labels(src) has "Person"
+  project src.name, dst.name, e.lbl
+| take 10
 ```
 
 ### Post-processing graph results
@@ -160,9 +156,9 @@ graph("Simple")
 Use the `graph-to-table` operator when you need to export all nodes and edges from a graph as raw tables (without pattern matching):
 
 ```kql
-graph("YaccNetwork")
+graph("Simple")
 | graph-to-table nodes as N, edges as E;
-N | summarize count() by labels(N)
+N | take 5
 ```
 
 ---
@@ -176,13 +172,13 @@ KQL has native vector operations — **don't export to Python** for cosine simil
 The most common vector operation.
 
 ```kql
-// Find the most similar items to a target vector
-let target_vec = toscalar(
-    Embeddings | where Word == "test" | project Vec
-);
-Embeddings
-| extend similarity = series_cosine_similarity(parse_json(Vec), target_vec)
-| top 10 by similarity desc
+// try it! — find Iris flowers most similar to a target using feature vectors
+let target_vec = pack_array(5.1, 3.5, 1.4, 0.2);
+Iris
+| extend Vec = pack_array(SepalLength, SepalWidth, PetalLength, PetalWidth)
+| extend similarity = series_cosine_similarity(Vec, target_vec)
+| top 5 by similarity desc
+| project Class, SepalLength, SepalWidth, similarity
 ```
 
 ### Combining vectors
@@ -328,27 +324,32 @@ StormEvents
 ### Period detection
 
 ```kql
-// Find periodic patterns
-Events
-| make-series count() default=0 on Timestamp step 1m
-| extend (periods, scores) = series_periods_detect(count_, 4.0, 1440.0, 2)
+// try it! — find periodic patterns in occupancy sensor data
+OccupancyDetection
+| make-series avg_temp = avg(Temperature) default=0 on Timestamp step 10m
+| extend (periods, scores) = series_periods_detect(avg_temp, 4.0, 1440.0, 2)
+| project periods, scores
 ```
 
 ### Sessionization
 
 ```kql
-// Group events into sessions with 30-minute gap
-Events
-| order by UserId, Timestamp asc
-| extend SessionId = row_window_session(Timestamp, 30m, 24h, UserId != prev(UserId))
+// try it! — group trace logs into sessions with 5-minute gap
+cluster("help").database("SampleLogs").TraceLogs
+| order by Source, Timestamp asc
+| extend SessionId = row_window_session(Timestamp, 5m, 1h, Source != prev(Source))
+| summarize EventCount = count(), SessionStart = min(Timestamp) by Source, SessionId
+| take 5
 ```
 
 ### Sliding window statistics
 
 ```kql
-// Rolling average over 7 days
-| make-series val=avg(Value) on Timestamp step 1d
-| extend rolling_avg = series_fir(val, repeat(1.0/7, 7), false)
+// try it! — rolling average on occupancy temperature
+OccupancyDetection
+| make-series avg_temp = avg(Temperature) on Timestamp step 1h
+| extend rolling_avg = series_fir(avg_temp, repeat(1.0/7, 7), false)
+| take 1
 ```
 
 ---
@@ -399,14 +400,14 @@ For data too large for `externaldata` or queried repeatedly, define a persistent
 ```
 
 ```kql
-// Query an external table using external_table()
-external_table("ExternalLogs")
-| where Timestamp > ago(1d)
-| summarize count() by Level
+// try it! — query the TaxiRides external table on the help cluster
+external_table("TaxiRides")
+| where pickup_datetime between (datetime(2016-01-01) .. datetime(2016-01-02))
+| summarize count() by payment_type
 ```
 
 ```kql
-// Discover available external tables
+// try it! — discover available external tables
 .show external tables
 ```
 
@@ -421,32 +422,32 @@ external_table("ExternalLogs")
 
 ## 6. Stored Functions
 
-Some databases include pre-built stored functions (e.g., `Decrypt`, `Dekrypt`, `Verify`).
+Some databases include pre-built stored functions. The help cluster has several in the Samples database.
 
 ### Discovering stored functions
 
 ```kql
-// Management command
+// try it!
 .show functions
 ```
 
 ### Invoking stored functions
 
 ```kql
-// Call a stored function
-Decrypt(ciphertext, key)
+// try it! — call a stored function with a parameter
+MyFunction2(5)
 
-// Use in a query pipeline
-Logs
-| extend plaintext = Decrypt(EncryptedField, "MYKEY")
-| where plaintext contains "suspicious"
+// try it! — use a stored function to filter a query pipeline
+StormEvents
+| where State in (InterestingStates())
+| summarize count() by State
 ```
 
 ### Common pitfalls with stored functions
 
 1. **String escaping**: KQL supports both single (`'...'`) and double (`"..."`) quotes for string literals. If a string contains special characters or backslashes, use verbatim syntax `@"..."` or `@'...'`:
    ```kql
-   Decrypt(field, @"C:\path\with\backslashes")
+   MyCalc(1.0, 2.5, 3.7)
    ```
 2. **Argument types**: Ensure you pass the right type. If the function expects `string` and you have `dynamic`, cast with `tostring()`.
 3. **Function not found**: Check the database — functions are database-scoped. Use `.show functions` to list available ones.
@@ -460,23 +461,23 @@ Logs
 When a subquery is referenced multiple times, `materialize()` computes it once:
 
 ```kql
-let expensive_result = materialize(
-    HugeLogs
-    | where Timestamp > ago(1d)
-    | summarize count() by SourceIP
-    | where count_ > 1000
+// try it! — compute once, use twice
+let top_states = materialize(
+    StormEvents
+    | summarize EventCount = count() by State
+    | where EventCount > 1000
 );
 // Use it twice without recomputing
-expensive_result | summarize total = sum(count_)
-| union (expensive_result | top 10 by count_ desc)
+top_states | summarize TotalEvents = sum(EventCount)
+| union (top_states | top 3 by EventCount desc)
 ```
 
 ### toscalar() for single-value subqueries
 
 ```kql
-// Extract a single value to use as a constant
-let threshold = toscalar(Stats | summarize percentile(Value, 95));
-Events | where Value > threshold
+// try it! — extract a single value to use as a constant
+let avg_damage = toscalar(StormEvents | summarize avg(DamageProperty));
+StormEvents | where DamageProperty > avg_damage | summarize count()
 ```
 
 ### datatable for inline test data
@@ -576,18 +577,16 @@ StormEvents
 
 ```kql
 // hint.shufflekey — for high-cardinality join keys (>1M distinct values)
-// Distributes data across nodes by key for parallel processing
-TableA
-| join hint.shufflekey=UserId kind=inner (TableB) on UserId
+StormEvents
+| join hint.shufflekey=EventId kind=inner (StormEvents | project EventId, State) on EventId
 
 // hint.strategy=broadcast — when left side is small (<100 MB)
-// Broadcasts the small table to all nodes
-SmallLookup
-| join hint.strategy=broadcast kind=inner (HugeTable) on Key
+PopulationData
+| join hint.strategy=broadcast kind=inner (StormEvents) on State
 
 // Use lookup instead of join when right side is small
-HugeTable
-| lookup kind=leftouter (SmallLookup) on Key
+StormEvents
+| lookup kind=leftouter (PopulationData) on State
 ```
 
 ### Use `in` instead of left semi join
@@ -596,12 +595,12 @@ For filtering by a single column, `in` is simpler and often faster:
 
 ```kql
 // ❌ Verbose
-Events
-| join kind=leftsemi (AllowList | project UserId) on UserId
+StormEvents
+| join kind=leftsemi (StormEvents | where State == "TEXAS" | project State) on State
 
 // ✅ Simpler and often faster
-Events
-| where UserId in (AllowList | project UserId)
+StormEvents
+| where State in (InterestingStates())
 ```
 
 ### Pre-filter dynamic columns with `has`
@@ -625,10 +624,10 @@ When `summarize` has high-cardinality group keys, use `hint.strategy=shuffle` to
 
 ```kql
 // ❌ Single-node bottleneck with millions of distinct keys
-Events | summarize count() by UserId
+StormEvents | summarize count() by EventId
 
 // ✅ Shuffle distributes work across all nodes
-Events | summarize hint.strategy=shuffle count() by UserId
+StormEvents | summarize hint.strategy=shuffle count() by EventId
 ```
 
 ### Query materialized views efficiently
@@ -636,9 +635,9 @@ Events | summarize hint.strategy=shuffle count() by UserId
 Use the `materialized_view()` function to query only the pre-aggregated part (faster), rather than the full view which may include un-materialized delta records:
 
 ```kql
-// Queries only the materialized (pre-computed) part — fastest
-materialized_view("MyAggView")
+// try it! — queries only the materialized (pre-computed) part — fastest
+materialized_view("DailyCovid19") | take 5
 
 // Queries materialized + delta records — complete but slower
-MyAggView
+DailyCovid19 | take 5
 ```
