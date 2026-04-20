@@ -31,10 +31,16 @@ SERVICEBUS_SUBSCRIPTION_NAME=my-subscription
 
 ```typescript
 import { ServiceBusClient } from "@azure/service-bus";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 const fullyQualifiedNamespace = process.env.SERVICEBUS_NAMESPACE!;
-const client = new ServiceBusClient(fullyQualifiedNamespace, new DefaultAzureCredential());
+const client = new ServiceBusClient(fullyQualifiedNamespace, credential);
 ```
 
 ## Core Workflow
@@ -221,7 +227,7 @@ const receiver = client.createReceiver("my-queue", { receiveMode: "receiveAndDel
 
 ## Best Practices
 
-1. **Use Entra ID auth** - Avoid connection strings in production
+1. **Use Entra ID auth** - Use `DefaultAzureCredential` for local development; use `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production
 2. **Reuse clients** - Create `ServiceBusClient` once, share across senders/receivers
 3. **Close resources** - Always close senders/receivers when done
 4. **Handle errors** - Implement `processError` callback for subscription receivers

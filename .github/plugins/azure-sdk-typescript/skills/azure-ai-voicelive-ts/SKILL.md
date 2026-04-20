@@ -42,10 +42,14 @@ AZURE_LOG_LEVEL=info
 ### Microsoft Entra ID (Recommended)
 
 ```typescript
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
 import { VoiceLiveClient } from "@azure/ai-voicelive";
 
-const credential = new DefaultAzureCredential();
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 const endpoint = "https://your-resource.cognitiveservices.azure.com";
 
 const client = new VoiceLiveClient(endpoint, credential);
@@ -81,7 +85,7 @@ VoiceLiveClient
 import { DefaultAzureCredential } from "@azure/identity";
 import { VoiceLiveClient } from "@azure/ai-voicelive";
 
-const credential = new DefaultAzureCredential();
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
 const endpoint = process.env.AZURE_VOICELIVE_ENDPOINT!;
 
 // Create client and start session
@@ -452,7 +456,7 @@ const audioContext = new AudioContext({ sampleRate: 24000 });
 
 ## Best Practices
 
-1. **Always use `DefaultAzureCredential`** — Never hardcode API keys
+1. **Use `DefaultAzureCredential` for local development; use `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production** — Never hardcode API keys
 2. **Set both modalities** — Include `["text", "audio"]` for voice assistants
 3. **Use Azure Semantic VAD** — Better turn detection than basic server VAD
 4. **Handle all error types** — Connection, auth, and protocol errors

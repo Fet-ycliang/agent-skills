@@ -36,11 +36,15 @@ STORAGE_CONTAINER_NAME=checkpoints
 
 ```typescript
 import { EventHubProducerClient, EventHubConsumerClient } from "@azure/event-hubs";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
 
 const fullyQualifiedNamespace = process.env.EVENTHUB_NAMESPACE!;
 const eventHubName = process.env.EVENTHUB_NAME!;
-const credential = new DefaultAzureCredential();
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 // Producer
 const producer = new EventHubProducerClient(fullyQualifiedNamespace, eventHubName, credential);

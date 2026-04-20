@@ -33,16 +33,22 @@ AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
 
 ## Authentication
 
-### DefaultAzureCredential (Recommended)
+### Microsoft Entra ID (Recommended)
 
 ```typescript
 import { QueueServiceClient } from "@azure/storage-queue";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
 const client = new QueueServiceClient(
   `https://${accountName}.queue.core.windows.net`,
-  new DefaultAzureCredential()
+  credential
 );
 ```
 
@@ -508,7 +514,7 @@ import {
 
 ## Best Practices
 
-1. **Use DefaultAzureCredential** — Prefer AAD over connection strings/keys
+1. **Use `DefaultAzureCredential` for local development; use `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production**
 2. **Always delete after processing** — Prevent duplicate processing
 3. **Handle poison messages** — Move failed messages to a dead-letter queue
 4. **Use appropriate visibility timeout** — Set based on expected processing time

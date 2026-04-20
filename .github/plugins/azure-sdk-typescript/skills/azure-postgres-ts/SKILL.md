@@ -60,10 +60,13 @@ await client.connect();
 
 ```typescript
 import { Client, Pool } from "pg";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
 
-// For system-assigned managed identity
-const credential = new DefaultAzureCredential();
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 // For user-assigned managed identity
 // const credential = new DefaultAzureCredential({
@@ -287,7 +290,7 @@ class AzurePostgresPool {
   private config: Omit<PoolConfig, "password">;
 
   constructor(config: Omit<PoolConfig, "password">) {
-    this.credential = new DefaultAzureCredential();
+    this.credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
     this.config = config;
   }
 

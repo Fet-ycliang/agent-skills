@@ -33,16 +33,22 @@ AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
 
 ## Authentication
 
-### DefaultAzureCredential (Recommended)
+### Microsoft Entra ID (Recommended)
 
 ```typescript
 import { BlobServiceClient } from "@azure/storage-blob";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
 const client = new BlobServiceClient(
   `https://${accountName}.blob.core.windows.net`,
-  new DefaultAzureCredential()
+  credential
 );
 ```
 
@@ -463,7 +469,7 @@ import {
 
 ## Best Practices
 
-1. **Use DefaultAzureCredential** — Prefer AAD over connection strings/keys
+1. **Use `DefaultAzureCredential` for local development; use `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production**
 2. **Use streaming for large files** — `uploadStream`/`downloadToFile` for files > 256MB
 3. **Set appropriate content types** — Use `setHTTPHeaders` for correct MIME types
 4. **Use SAS tokens for client access** — Generate short-lived tokens for browser uploads

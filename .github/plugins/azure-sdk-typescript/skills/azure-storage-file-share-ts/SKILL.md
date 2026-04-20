@@ -58,16 +58,22 @@ const client = new ShareServiceClient(
 );
 ```
 
-### DefaultAzureCredential
+### Microsoft Entra ID
 
 ```typescript
 import { ShareServiceClient } from "@azure/storage-file-share";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
 const client = new ShareServiceClient(
   `https://${accountName}.file.core.windows.net`,
-  new DefaultAzureCredential()
+  credential
 );
 ```
 
@@ -475,7 +481,7 @@ import {
 ## Best Practices
 
 1. **Use connection strings for simplicity** — Easiest setup for development
-2. **Use DefaultAzureCredential for production** — Enable managed identity in Azure
+2. **Use `DefaultAzureCredential` for local development; use `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production**
 3. **Set quotas on shares** — Prevent unexpected storage costs
 4. **Use streaming for large files** — `uploadStream`/`downloadToFile` for files > 256MB
 5. **Use ranges for partial updates** — More efficient than full file replacement

@@ -38,7 +38,13 @@ WEBPUBSUB_ENDPOINT=https://<resource>.webpubsub.azure.com
 
 ```typescript
 import { WebPubSubServiceClient, AzureKeyCredential } from "@azure/web-pubsub";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 // Connection string
 const client = new WebPubSubServiceClient(
@@ -46,10 +52,10 @@ const client = new WebPubSubServiceClient(
   "chat"  // hub name
 );
 
-// DefaultAzureCredential (recommended)
+// Microsoft Entra ID (recommended)
 const client2 = new WebPubSubServiceClient(
   process.env.WEBPUBSUB_ENDPOINT!,
-  new DefaultAzureCredential(),
+  credential,
   "chat"
 );
 
@@ -306,7 +312,7 @@ import {
 
 ## Best Practices
 
-1. **Use Entra ID auth** - `DefaultAzureCredential` for production
+1. **Use Entra ID auth** - Use `DefaultAzureCredential` for local development; use `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production
 2. **Register handlers before start** - Don't miss initial events
 3. **Use groups for channels** - Organize messages by topic/room
 4. **Handle reconnection** - Client auto-reconnects by default

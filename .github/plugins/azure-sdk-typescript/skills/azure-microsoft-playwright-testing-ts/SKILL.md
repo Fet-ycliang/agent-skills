@@ -49,14 +49,20 @@ az login
 // playwright.service.config.ts
 import { defineConfig } from "@playwright/test";
 import { createAzurePlaywrightConfig, ServiceOS } from "@azure/playwright";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
 import config from "./playwright.config";
+
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 export default defineConfig(
   config,
   createAzurePlaywrightConfig(config, {
     os: ServiceOS.LINUX,
-    credential: new DefaultAzureCredential(),
+    credential,
   })
 );
 ```
@@ -92,7 +98,7 @@ export default defineConfig(
     os: ServiceOS.LINUX,
     connectTimeout: 30000,
     exposeNetwork: "<loopback>",
-    credential: new DefaultAzureCredential(),
+    credential: new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]}),
   })
 );
 ```
@@ -115,7 +121,7 @@ export default defineConfig(
   config,
   createAzurePlaywrightConfig(config, {
     os: ServiceOS.LINUX,
-    credential: new DefaultAzureCredential(),
+    credential: new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]}),
   }),
   {
     reporter: [
@@ -285,7 +291,7 @@ export default defineConfig(
   createAzurePlaywrightConfig(config, {
     os: ServiceOS.LINUX,
     connectTimeout: 30000,
-    credential: new DefaultAzureCredential(),
+    credential: new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]}),
   }),
   {
     reporter: [
@@ -299,7 +305,7 @@ export default defineConfig(
 ## Best Practices
 
 1. **Use Entra ID auth** — More secure than access tokens
-2. **Provide explicit credential** — Always pass `credential: new DefaultAzureCredential()`
+2. **Use `DefaultAzureCredential` for local development; use `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production**
 3. **Enable artifacts** — Set `trace: "on-first-retry"`, `video: "retain-on-failure"` in config
 4. **Scale workers** — Use `--workers=20` or higher for parallel execution
 5. **Region selection** — Choose region closest to your test targets

@@ -103,7 +103,7 @@ Follow this structure (based on existing Azure SDK skills):
 1. **Title** — `# SDK Name`
 2. **Installation** — `pip install`, `npm install`, etc.
 3. **Environment Variables** — Required configuration
-4. **Authentication** — Always `DefaultAzureCredential`
+4. **Authentication** — Use a specific Microsoft Entra Token credential like `ManagedIdentityCredential` or `WorkloadIdentityCredential` for production.  `DefaultAzureCredential` is only recommended for local development. To use DefaultAzureCredential in production, set the environment variable `AZURE_TOKEN_CREDENTIAL` to `prod` or the specific target credential.
 5. **Core Workflow** — Minimal viable example
 6. **Feature Tables** — Clients, methods, tools
 7. **Best Practices** — Numbered list
@@ -111,7 +111,7 @@ Follow this structure (based on existing Azure SDK skills):
 
 ### Authentication Pattern (All Languages)
 
-Always use `DefaultAzureCredential`:
+For local development, use `DefaultAzureCredential` which supports multiple auth methods. For production, use a specific credential type or configure `DefaultAzureCredential` with environment variable `AZURE_TOKEN_CREDENTIAL` set to `prod` or specify the target credential.
 
 ```python
 # Python
@@ -136,9 +136,14 @@ ServiceClient client = new ServiceClientBuilder()
 ```
 
 ```typescript
+
 // TypeScript
-import { DefaultAzureCredential } from "@azure/identity";
-const credential = new DefaultAzureCredential();
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+//option 1: use DefaultAzureCredential with environment variable `AZURE_TOKEN_CREDENTIALS` set to specify production credential
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=`<specific_credential>` to use DefaultAzureCredential in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+//option 2: directly use specific credential for production
+// const credential = new ManagedIdentityCredential(); // or other specific credential for production
 const client = new ServiceClient(endpoint, credential);
 ```
 

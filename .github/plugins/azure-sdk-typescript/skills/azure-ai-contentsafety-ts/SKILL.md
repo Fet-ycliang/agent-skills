@@ -45,11 +45,17 @@ const client = ContentSafetyClient(
 
 ```typescript
 import ContentSafetyClient from "@azure-rest/ai-content-safety";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+
+// Option 1: DefaultAzureCredential — for local dev; set AZURE_TOKEN_CREDENTIALS=prod for production
+// set AZURE_TOKEN_CREDENTIALS=prod or AZURE_TOKEN_CREDENTIALS=<specific_credential> to use in production
+const credential = new DefaultAzureCredential({requiredEnvVars: ["AZURE_TOKEN_CREDENTIALS"]});
+// Option 2: Use a specific credential directly for production
+// const credential = new ManagedIdentityCredential();
 
 const client = ContentSafetyClient(
   process.env.CONTENT_SAFETY_ENDPOINT!,
-  new DefaultAzureCredential()
+  credential
 );
 ```
 
