@@ -1,8 +1,20 @@
 ---
 name: azure-ai-fine-tuning
-description: Use when the user wants to fine-tune a model on Azure AI Foundry — including dataset preparation, training, evaluation, and deployment.
-argument-hint: [describe the model you want to fine-tune and the task it should perform]
+description: "Fine-tune models on Azure AI Foundry — dataset preparation, grader design, training (SFT/DPO/RFT), monitoring, checkpoint selection, deployment, and evaluation. WHEN: fine-tune, SFT, DPO, RFT, training data, grader, reinforcement learning, distillation, custom model, pass_threshold, training job."
+license: MIT
+metadata:
+  author: Microsoft
+  version: "1.0.0"
 ---
+
+> **Parent Skill:** [Microsoft Foundry](../SKILL.md)
+
+> **⚠️ MANDATORY:** Before running ANY script or command:
+> 1. Read the **workflow file** for your stage (`workflows/quickstart.md`, `workflows/full-pipeline.md`, etc.)
+> 2. Read the **reference file** for your specific task (`references/grader-design.md`, `references/hyperparameters.md`, etc.)
+> 3. **Validate your data** with `scripts/validate/` before submitting
+>
+> Fine-tuning has many platform gotchas. Skipping these steps leads to failed jobs and wasted quota.
 
 # Goal
 
