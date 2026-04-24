@@ -1,15 +1,26 @@
 ---
 name: azure-keyvault-certificates-rust
 description: |
-  Azure Key Vault Certificates SDK for Rust (v0.12.0). Use for creating, managing, and using X.509 certificates including self-signed and CA-issued.
+  Azure Key Vault Certificates library for Rust. Use for creating, managing, and using X.509 certificates including self-signed and CA-issued.
   Triggers: "keyvault certificates rust", "CertificateClient rust", "create certificate rust", "sign with certificate rust".
+license: MIT
+metadata:
+  author: Microsoft
+  package: azure_security_keyvault_certificates
 ---
 
-# Azure Key Vault Certificates SDK for Rust
+# Azure Key Vault Certificates library for Rust
 
-> `azure_security_keyvault_certificates` v0.12.0 — Manage X.509 certificates for TLS/SSL, code signing, and authentication.
+Manage X.509 certificates for TLS/SSL, code signing, and authentication.
 
-> **IMPORTANT:** Only use the official `azure_security_keyvault_certificates` crate installed via `cargo add` from [crates.io](https://crates.io/crates/azure_security_keyvault_certificates). Do NOT use unofficial or community crates.
+Use this skill when:
+
+- An app needs to create or manage X.509 certificates in Key Vault from Rust
+- You need self-signed or CA-issued certificates
+- You need to sign data using a certificate's key
+- You need long-running operations (LRO) for certificate issuance
+
+> **IMPORTANT:** Only use the official `azure_security_keyvault_certificates` crate published by the [azure-sdk](https://crates.io/users/azure-sdk) crates.io user. Do NOT use unofficial or community crates. Official crates use underscores in names and none have version 0.21.0.
 
 ## Installation
 
@@ -17,13 +28,15 @@ description: |
 cargo add azure_security_keyvault_certificates azure_identity tokio futures
 ```
 
+> **Do not** add `azure_core` directly to `Cargo.toml`. It is re-exported by `azure_security_keyvault_certificates`.
+
 ## Environment Variables
 
 ```bash
 AZURE_KEYVAULT_URL=https://<vault-name>.vault.azure.net/
 ```
 
-## Client Setup
+## Authentication
 
 ```rust
 use azure_identity::DeveloperToolsCredential;
@@ -31,6 +44,7 @@ use azure_security_keyvault_certificates::CertificateClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Local dev: DeveloperToolsCredential. Production: use ManagedIdentityCredential.
     let credential = DeveloperToolsCredential::new(None)?;
     let client = CertificateClient::new(
         "https://<your-key-vault-name>.vault.azure.net/",
@@ -48,9 +62,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Create Self-Signed Certificate
+## Core Workflow
 
-Creating a certificate is a long-running operation (LRO) using `Poller`:
+### Create Self-Signed Certificate (LRO)
+
+Creating a certificate is a long-running operation. `Poller<T>` implements `IntoFuture` — just `.await`:
 
 ```rust
 use azure_security_keyvault_certificates::{
@@ -86,59 +102,60 @@ let body = CertificateCreateParameters {
     ..Default::default()
 };
 
-// Start the LRO
-let poller = client
-    .create_certificate("cert-name", body.try_into()?, None)
-    .await?;
+// Poller implements IntoFuture — await directly for completion
+let cert = client
+    .create_certificate("cert-name", body.try_into()?, None)?
+    .await?
+    .into_model()?;
 
-// Wait for completion
-let cert = poller.wait().await?.into_model()?;
 println!(
-    "Certificate Name: {:?}, Version: {:?}",
+    "Name: {:?}, Version: {:?}",
     cert.resource_id()?.name,
     cert.resource_id()?.version,
 );
 ```
 
-## Update Certificate Properties
+### Update Certificate Properties
 
 ```rust
 use azure_security_keyvault_certificates::models::CertificateUpdateParameters;
 use std::collections::HashMap;
 
-let update_params = CertificateUpdateParameters {
+#[allow(clippy::needless_update)]
+let params = CertificateUpdateParameters {
     tags: Some(HashMap::from_iter(vec![("env".into(), "prod".into())])),
     ..Default::default()
 };
 
 client
-    .update_certificate("cert-name", update_params.try_into()?, None)
+    .update_certificate("cert-name", params.try_into()?, None)
     .await?
     .into_model()?;
 ```
 
-## Delete Certificate
+### Delete Certificate
 
 ```rust
 client.delete_certificate("cert-name", None).await?;
 ```
 
-## List Certificates
+### List Certificates (Pagination)
+
+`list_certificate_properties` returns a `Pager<T>` — iterate items directly:
 
 ```rust
 use azure_security_keyvault_certificates::ResourceExt;
-use futures::TryStreamExt;
+use futures::TryStreamExt as _;
 
-let mut pager = client.list_certificate_properties(None)?.into_stream();
+let mut pager = client.list_certificate_properties(None)?;
 while let Some(cert) = pager.try_next().await? {
-    let name = cert.resource_id()?.name;
-    println!("Found Certificate: {}", name);
+    println!("Found: {}", cert.resource_id()?.name);
 }
 ```
 
 ## Key Operations Using Certificates
 
-Certificates in Key Vault have an associated key. Use the Key Vault Keys SDK to perform crypto operations:
+Certificates in Key Vault have an associated key. Use the Key Vault Keys SDK for crypto operations:
 
 ```rust
 use azure_security_keyvault_keys::{
@@ -169,22 +186,23 @@ println!("Signature: {:?}", result.result);
 
 ## Certificate Formats
 
-| Format | Content Type | Use Case |
-| ------ | ------------ | -------- |
-| PKCS#12 | `application/x-pkcs12` | Bundled cert + private key |
+| Format  | Content Type             | Use Case                            |
+| ------- | ------------------------ | ----------------------------------- |
+| PKCS#12 | `application/x-pkcs12`   | Bundled cert + private key          |
 | PEM     | `application/x-pem-file` | Base64-encoded, common in Linux/web |
 
 ## Best Practices
 
-1. **Use Entra ID auth** — `DeveloperToolsCredential` for dev, `ManagedIdentityCredential` for production
-2. **Use `..Default::default()`** — for struct update syntax on all model types
-3. **Use `ResourceExt`** — to extract certificate name/version from IDs
-4. **Poll LROs** — `create_certificate` returns a `Poller`; call `.wait().await` for completion
-5. **Reuse clients** — `CertificateClient` is thread-safe
+1. **Use `DeveloperToolsCredential`** for local dev, **`ManagedIdentityCredential`** for production
+2. **Never hardcode credentials** — use environment variables or managed identity
+3. **Use `..Default::default()`** for struct update syntax on all model types
+4. **Use `ResourceExt`** to extract certificate name/version from IDs
+5. **LROs** — `create_certificate` returns a `Poller`; `.await` directly for completion
+6. **Reuse clients** — `CertificateClient` is thread-safe
 
 ## Reference Links
 
-| Resource      | Link                                                              |
-| ------------- | ----------------------------------------------------------------- |
-| API Reference | https://docs.rs/azure_security_keyvault_certificates              |
-| crates.io     | https://crates.io/crates/azure_security_keyvault_certificates     |
+| Resource      | Link                                                          |
+| ------------- | ------------------------------------------------------------- |
+| API Reference | https://docs.rs/azure_security_keyvault_certificates          |
+| crates.io     | https://crates.io/crates/azure_security_keyvault_certificates |

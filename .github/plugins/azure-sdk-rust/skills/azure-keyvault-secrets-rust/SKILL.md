@@ -1,15 +1,26 @@
 ---
 name: azure-keyvault-secrets-rust
 description: |
-  Azure Key Vault Secrets SDK for Rust (v0.13.0). Use for storing and retrieving secrets, passwords, and API keys.
+  Azure Key Vault Secrets library for Rust. Use for storing and retrieving secrets, passwords, and API keys.
   Triggers: "keyvault secrets rust", "SecretClient rust", "get secret rust", "set secret rust".
+license: MIT
+metadata:
+  author: Microsoft
+  package: azure_security_keyvault_secrets
 ---
 
-# Azure Key Vault Secrets SDK for Rust
+# Azure Key Vault Secrets library for Rust
 
-> `azure_security_keyvault_secrets` v0.13.0 — Secure storage for passwords, API keys, and connection strings.
+Secure storage for passwords, API keys, and connection strings.
 
-> **IMPORTANT:** Only use the official `azure_security_keyvault_secrets` crate installed via `cargo add` from [crates.io](https://crates.io/crates/azure_security_keyvault_secrets). Do NOT use unofficial or community crates.
+Use this skill when:
+
+- An app needs to store or retrieve secrets from Azure Key Vault in Rust
+- You need to set, get, update, or delete secrets
+- You need to list secret properties with pagination
+- You need error handling for missing secrets
+
+> **IMPORTANT:** Only use the official `azure_security_keyvault_secrets` crate published by the [azure-sdk](https://crates.io/users/azure-sdk) crates.io user. Do NOT use unofficial or community crates. Official crates use underscores in names and none have version 0.21.0.
 
 ## Installation
 
@@ -17,13 +28,15 @@ description: |
 cargo add azure_security_keyvault_secrets azure_identity tokio futures
 ```
 
+> **Do not** add `azure_core` directly to `Cargo.toml`. It is re-exported by `azure_security_keyvault_secrets`.
+
 ## Environment Variables
 
 ```bash
 AZURE_KEYVAULT_URL=https://<vault-name>.vault.azure.net/
 ```
 
-## Client Setup
+## Authentication
 
 ```rust
 use azure_identity::DeveloperToolsCredential;
@@ -31,6 +44,7 @@ use azure_security_keyvault_secrets::SecretClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Local dev: DeveloperToolsCredential. Production: use ManagedIdentityCredential.
     let credential = DeveloperToolsCredential::new(None)?;
     let client = SecretClient::new(
         "https://<your-key-vault-name>.vault.azure.net/",
@@ -48,36 +62,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Set Secret
+## Core Workflow
+
+### Set Secret
 
 ```rust
 use azure_security_keyvault_secrets::{models::SetSecretParameters, ResourceExt};
 
-let secret_set_parameters = SetSecretParameters {
+let params = SetSecretParameters {
     value: Some("secret-value".into()),
     ..Default::default()
 };
 
 let secret = client
-    .set_secret("secret-name", secret_set_parameters.try_into()?, None)
+    .set_secret("secret-name", params.try_into()?, None)
     .await?
     .into_model()?;
 
 println!(
-    "Secret Name: {:?}, Value: {:?}, Version: {:?}",
+    "Name: {:?}, Value: {:?}, Version: {:?}",
     secret.resource_id()?.name,
     secret.value,
     secret.resource_id()?.version
 );
 ```
 
-## Update Secret Properties
+### Update Secret Properties
 
 ```rust
 use azure_security_keyvault_secrets::models::UpdateSecretPropertiesParameters;
 use std::collections::HashMap;
 
-let secret_update_parameters = UpdateSecretPropertiesParameters {
+#[allow(clippy::needless_update)]
+let params = UpdateSecretPropertiesParameters {
     content_type: Some("text/plain".into()),
     tags: Some(HashMap::from_iter(vec![(
         "tag-name".into(),
@@ -87,33 +104,28 @@ let secret_update_parameters = UpdateSecretPropertiesParameters {
 };
 
 client
-    .update_secret_properties(
-        "secret-name",
-        secret_update_parameters.try_into()?,
-        None,
-    )
+    .update_secret_properties("secret-name", params.try_into()?, None)
     .await?
     .into_model()?;
 ```
 
-## Delete Secret
+### Delete Secret
 
 ```rust
 client.delete_secret("secret-name", None).await?;
 ```
 
-## List Secrets
+### List Secrets (Pagination)
 
-Note: `list_secret_properties` returns a pager directly (no `.into_stream()`).
+`list_secret_properties` returns a `Pager<T>` — iterate items directly:
 
 ```rust
 use azure_security_keyvault_secrets::ResourceExt;
-use futures::TryStreamExt;
+use futures::TryStreamExt as _;
 
 let mut pager = client.list_secret_properties(None)?;
 while let Some(secret) = pager.try_next().await? {
-    let name = secret.resource_id()?.name;
-    println!("Found Secret with Name: {}", name);
+    println!("Found: {}", secret.resource_id()?.name);
 }
 ```
 
@@ -140,14 +152,15 @@ match client.get_secret("secret-name", None).await {
 
 ## Best Practices
 
-1. **Use Entra ID auth** — `DeveloperToolsCredential` for dev, `ManagedIdentityCredential` for production
-2. **Use `..Default::default()`** — for struct update syntax on all model types
-3. **Use `ResourceExt`** — to extract resource name/version from secret IDs
-4. **Reuse clients** — `SecretClient` is thread-safe
+1. **Use `DeveloperToolsCredential`** for local dev, **`ManagedIdentityCredential`** for production
+2. **Never hardcode credentials** — use environment variables or managed identity
+3. **Use `..Default::default()`** for struct update syntax on all model types
+4. **Use `ResourceExt`** to extract resource name/version from secret IDs
+5. **Reuse clients** — `SecretClient` is thread-safe
 
 ## Reference Links
 
-| Resource      | Link                                                          |
-| ------------- | ------------------------------------------------------------- |
-| API Reference | https://docs.rs/azure_security_keyvault_secrets               |
-| crates.io     | https://crates.io/crates/azure_security_keyvault_secrets      |
+| Resource      | Link                                                     |
+| ------------- | -------------------------------------------------------- |
+| API Reference | https://docs.rs/azure_security_keyvault_secrets          |
+| crates.io     | https://crates.io/crates/azure_security_keyvault_secrets |

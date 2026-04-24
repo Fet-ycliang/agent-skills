@@ -1,23 +1,34 @@
 ---
 name: azure-storage-blob-rust
 description: |
-  Azure Blob Storage SDK for Rust (v0.11.0). Use for uploading, downloading, and managing blobs and containers.
+  Azure Blob Storage library for Rust. Use for uploading, downloading, and managing blobs and containers.
   Triggers: "blob storage rust", "BlobClient rust", "upload blob rust", "download blob rust", "storage container rust".
+license: MIT
+metadata:
+  author: Microsoft
+  package: azure_storage_blob
 ---
 
-# Azure Blob Storage SDK for Rust
+# Azure Blob Storage library for Rust
 
-> `azure_storage_blob` v0.11.0 — Client library for Azure Blob Storage.
+Client library for Azure Blob Storage — upload, download, and manage blobs and containers.
 
-> **IMPORTANT:** Only use the official `azure_storage_blob` crate installed via `cargo add` from [crates.io](https://crates.io/crates/azure_storage_blob). Do NOT use the unofficial `azure_storage` or `azure_sdk_for_rust` community crates.
+Use this skill when:
 
-> **Warning:** This crate is under active development and not suitable for production environments.
+- An app needs to upload or download blobs from Azure Storage in Rust
+- You need to create or manage blob containers
+- You need to list blobs in a container
+- You need RBAC-based auth for blob operations
+
+> **IMPORTANT:** Only use the official `azure_storage_blob` crate published by the [azure-sdk](https://crates.io/users/azure-sdk) crates.io user. Do NOT use the unofficial `azure_storage`, `azure_storage_blobs`, or `azure_sdk_for_rust` community crates. Official crates use underscores in names and none have version 0.21.0.
 
 ## Installation
 
 ```sh
 cargo add azure_storage_blob azure_identity tokio
 ```
+
+> **Do not** add `azure_core` directly to `Cargo.toml`. It is re-exported by `azure_storage_blob`.
 
 ## Environment Variables
 
@@ -33,6 +44,7 @@ use azure_identity::DeveloperToolsCredential;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Local dev: DeveloperToolsCredential. Production: use ManagedIdentityCredential.
     let credential = DeveloperToolsCredential::new(None)?;
     let blob_client = BlobClient::new(
         "https://<storage_account_name>.blob.core.windows.net/",
@@ -53,7 +65,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `BlobContainerClient` | Container operations, list blobs          |
 | `BlobClient`          | Individual blob operations                |
 
-## Upload Blob
+## Core Workflow
+
+### Upload Blob
 
 ```rust
 use azure_core::http::RequestContent;
@@ -62,6 +76,7 @@ use azure_identity::DeveloperToolsCredential;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Local dev: DeveloperToolsCredential. Production: use ManagedIdentityCredential.
     let credential = DeveloperToolsCredential::new(None)?;
     let blob_client = BlobClient::new(
         "https://<storage_account_name>.blob.core.windows.net/",
@@ -73,16 +88,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let data = b"hello world";
     blob_client
-        .upload(
-            RequestContent::from(data.to_vec()),
-            None,
-        )
+        .upload(RequestContent::from(data.to_vec()), None)
         .await?;
     Ok(())
 }
 ```
 
-## Download Blob / Get Properties
+### Download Blob / Get Properties
 
 ```rust
 // Get blob properties
@@ -93,16 +105,17 @@ let response = blob_client.download(None).await?;
 let content = response.into_body().collect_bytes().await?;
 ```
 
-## Delete Blob
+### Delete Blob
 
 ```rust
 blob_client.delete(None).await?;
 ```
 
-## Container Operations
+### Container Operations
 
 ```rust
 use azure_storage_blob::BlobContainerClient;
+use futures::TryStreamExt as _;
 
 let container_client = BlobContainerClient::new(
     "https://<account>.blob.core.windows.net/",
@@ -114,7 +127,7 @@ let container_client = BlobContainerClient::new(
 // Create container
 container_client.create(None).await?;
 
-// List blobs
+// List blobs (Pager<T> — iterate items directly)
 let mut pager = container_client.list_blobs(None)?;
 while let Some(blob) = pager.try_next().await? {
     println!("Blob: {}", blob.name);
@@ -133,14 +146,15 @@ For Entra ID auth, assign one of these roles:
 
 ## Best Practices
 
-1. **Use Entra ID auth** — `DeveloperToolsCredential` for dev, `ManagedIdentityCredential` for production
-2. **Use `RequestContent::from()`** — to wrap upload data
-3. **Assign RBAC roles** — ensure "Storage Blob Data Contributor" for write access
-4. **Reuse clients** — clients are thread-safe
+1. **Use `DeveloperToolsCredential`** for local dev, **`ManagedIdentityCredential`** for production
+2. **Never hardcode credentials** — use environment variables or managed identity
+3. **Use `RequestContent::from()`** to wrap upload data
+4. **Assign RBAC roles** — ensure "Storage Blob Data Contributor" for write access
+5. **Reuse clients** — clients are thread-safe
 
 ## Reference Links
 
-| Resource      | Link                                           |
-| ------------- | ---------------------------------------------- |
-| API Reference | https://docs.rs/azure_storage_blob             |
-| crates.io     | https://crates.io/crates/azure_storage_blob    |
+| Resource      | Link                                        |
+| ------------- | ------------------------------------------- |
+| API Reference | https://docs.rs/azure_storage_blob          |
+| crates.io     | https://crates.io/crates/azure_storage_blob |

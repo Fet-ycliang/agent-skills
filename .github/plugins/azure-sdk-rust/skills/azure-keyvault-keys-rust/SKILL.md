@@ -1,15 +1,26 @@
 ---
 name: azure-keyvault-keys-rust
 description: |
-  Azure Key Vault Keys SDK for Rust (v0.13.0). Use for creating, managing, and using cryptographic keys including RSA, EC, and HSM-protected keys.
+  Azure Key Vault Keys library for Rust. Use for creating, managing, and using cryptographic keys including RSA, EC, and HSM-protected keys.
   Triggers: "keyvault keys rust", "KeyClient rust", "create key rust", "encrypt rust", "wrap key rust", "sign rust".
+license: MIT
+metadata:
+  author: Microsoft
+  package: azure_security_keyvault_keys
 ---
 
-# Azure Key Vault Keys SDK for Rust
+# Azure Key Vault Keys library for Rust
 
-> `azure_security_keyvault_keys` v0.13.0 — Secure storage and management of cryptographic keys.
+Secure storage and management of cryptographic keys — RSA, EC, and HSM-protected.
 
-> **IMPORTANT:** Only use the official `azure_security_keyvault_keys` crate installed via `cargo add` from [crates.io](https://crates.io/crates/azure_security_keyvault_keys). Do NOT use unofficial or community crates.
+Use this skill when:
+
+- An app needs to create or manage cryptographic keys in Key Vault from Rust
+- You need to wrap/unwrap data encryption keys (envelope encryption)
+- You need to sign or verify data with Key Vault keys
+- You need HSM-protected keys
+
+> **IMPORTANT:** Only use the official `azure_security_keyvault_keys` crate published by the [azure-sdk](https://crates.io/users/azure-sdk) crates.io user. Do NOT use unofficial or community crates. Official crates use underscores in names and none have version 0.21.0.
 
 ## Installation
 
@@ -17,13 +28,15 @@ description: |
 cargo add azure_security_keyvault_keys azure_identity tokio futures
 ```
 
+> **Do not** add `azure_core` directly to `Cargo.toml`. It is re-exported by `azure_security_keyvault_keys`.
+
 ## Environment Variables
 
 ```bash
 AZURE_KEYVAULT_URL=https://<vault-name>.vault.azure.net/
 ```
 
-## Client Setup
+## Authentication
 
 ```rust
 use azure_identity::DeveloperToolsCredential;
@@ -31,6 +44,7 @@ use azure_security_keyvault_keys::KeyClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Local dev: DeveloperToolsCredential. Production: use ManagedIdentityCredential.
     let credential = DeveloperToolsCredential::new(None)?;
     let client = KeyClient::new(
         "https://<your-key-vault-name>.vault.azure.net/",
@@ -48,7 +62,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Create Key
+## Core Workflow
+
+### Create Key
 
 ```rust
 use azure_security_keyvault_keys::{
@@ -69,46 +85,48 @@ let key = client
     .into_model()?;
 
 println!(
-    "Key Name: {:?}, Type: {:?}, Version: {:?}",
+    "Name: {:?}, Type: {:?}, Version: {:?}",
     key.resource_id()?.name,
     key.key.as_ref().map(|k| k.kty.as_ref()),
     key.resource_id()?.version,
 );
 ```
 
-## Update Key Properties
+### Update Key Properties
 
 ```rust
 use azure_security_keyvault_keys::models::UpdateKeyPropertiesParameters;
 use std::collections::HashMap;
 
-let key_update_parameters = UpdateKeyPropertiesParameters {
+#[allow(clippy::needless_update)]
+let params = UpdateKeyPropertiesParameters {
     tags: Some(HashMap::from_iter(vec![("tag-name".into(), "tag-value".into())])),
     ..Default::default()
 };
 
 client
-    .update_key_properties("key-name", key_update_parameters.try_into()?, None)
+    .update_key_properties("key-name", params.try_into()?, None)
     .await?
     .into_model()?;
 ```
 
-## Delete Key
+### Delete Key
 
 ```rust
 client.delete_key("key-name", None).await?;
 ```
 
-## List Keys
+### List Keys (Pagination)
+
+`list_key_properties` returns a `Pager<T>` — iterate items directly:
 
 ```rust
 use azure_security_keyvault_keys::ResourceExt;
-use futures::TryStreamExt;
+use futures::TryStreamExt as _;
 
-let mut pager = client.list_key_properties(None)?.into_stream();
+let mut pager = client.list_key_properties(None)?;
 while let Some(key) = pager.try_next().await? {
-    let name = key.resource_id()?.name;
-    println!("Found Key with Name: {}", name);
+    println!("Found: {}", key.resource_id()?.name);
 }
 ```
 
@@ -166,24 +184,25 @@ assert_eq!(unwrapped.result.as_ref(), Some(&dek));
 
 ## Key Types
 
-| Type   | Use Case                      | Parameter           |
-| ------ | ----------------------------- | ------------------- |
-| EC     | Signing, key agreement        | `KeyType::Ec`       |
-| RSA    | Encryption, signing, wrapping | `KeyType::Rsa`      |
-| Oct    | Symmetric operations (HSM)    | `KeyType::Oct`      |
-| EC-HSM | HSM-protected EC keys         | `KeyType::EcHsm`   |
-| RSA-HSM| HSM-protected RSA keys        | `KeyType::RsaHsm`  |
+| Type    | Use Case                      | Parameter         |
+| ------- | ----------------------------- | ----------------- |
+| EC      | Signing, key agreement        | `KeyType::Ec`     |
+| RSA     | Encryption, signing, wrapping | `KeyType::Rsa`    |
+| Oct     | Symmetric operations (HSM)    | `KeyType::Oct`    |
+| EC-HSM  | HSM-protected EC keys         | `KeyType::EcHsm`  |
+| RSA-HSM | HSM-protected RSA keys        | `KeyType::RsaHsm` |
 
 ## Best Practices
 
-1. **Use Entra ID auth** — `DeveloperToolsCredential` for dev, `ManagedIdentityCredential` for production
-2. **Use `..Default::default()`** — for struct update syntax on all model types
-3. **Use `ResourceExt`** — to extract key name/version from key IDs
-4. **Reuse clients** — `KeyClient` is thread-safe
+1. **Use `DeveloperToolsCredential`** for local dev, **`ManagedIdentityCredential`** for production
+2. **Never hardcode credentials** — use environment variables or managed identity
+3. **Use `..Default::default()`** for struct update syntax on all model types
+4. **Use `ResourceExt`** to extract key name/version from key IDs
+5. **Reuse clients** — `KeyClient` is thread-safe
 
 ## Reference Links
 
-| Resource      | Link                                                      |
-| ------------- | --------------------------------------------------------- |
-| API Reference | https://docs.rs/azure_security_keyvault_keys              |
-| crates.io     | https://crates.io/crates/azure_security_keyvault_keys     |
+| Resource      | Link                                                  |
+| ------------- | ----------------------------------------------------- |
+| API Reference | https://docs.rs/azure_security_keyvault_keys          |
+| crates.io     | https://crates.io/crates/azure_security_keyvault_keys |
