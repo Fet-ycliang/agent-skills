@@ -39,7 +39,7 @@ AZURE_STORAGE_ENDPOINT=https://<account>.blob.core.windows.net/
 ## Authentication
 
 ```rust
-use azure_storage_blob::{BlobClient, BlobClientOptions};
+use azure_storage_blob::BlobClient;
 use azure_identity::DeveloperToolsCredential;
 
 #[tokio::main]
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "container_name",
         "blob_name",
         Some(credential),
-        Some(BlobClientOptions::default()),
+        None,
     )?;
     Ok(())
 }
@@ -71,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 use azure_core::http::RequestContent;
-use azure_storage_blob::{BlobClient, BlobClientOptions};
+use azure_storage_blob::BlobClient;
 use azure_identity::DeveloperToolsCredential;
 
 #[tokio::main]
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "container_name",
         "blob_name",
         Some(credential),
-        Some(BlobClientOptions::default()),
+        None,
     )?;
 
     let data = b"hello world";
